@@ -20,6 +20,7 @@
 #include <cbplugin.h> // for "class cbPlugin"
 
 class cbEditor;
+class ClangFormatProcess;
 
 class cbClangFormat : public cbPlugin
 {
@@ -133,6 +134,8 @@ class cbClangFormat : public cbPlugin
         void OnUpdateMenuFormatEditorFile(wxUpdateUIEvent& event);
         void OnUpdateMenuFormatEditorSelection(wxUpdateUIEvent& event);
         void OnProcessEnd(wxProcessEvent &event);
+
+        std::map<int,ClangFormatProcess*> clangFormatProcesses_;
 
         DECLARE_EVENT_TABLE();
 };

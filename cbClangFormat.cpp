@@ -22,13 +22,15 @@ namespace
 
 // events handling
 BEGIN_EVENT_TABLE(cbClangFormat, cbPlugin)
-    EVT_MENU(ID_FORMAT_EDITOR_FILE,           cbClangFormat::OnFormatEditorFile)
-    EVT_MENU(ID_FORMAT_EDITOR_SELECTION,      cbClangFormat::OnFormatEditorSelection)
-    EVT_MENU(ID_FORMAT_PROJECT_FILE,          cbClangFormat::OnFormatProjectFile)
-    EVT_UPDATE_UI(ID_FORMAT_EDITOR_FILE,      cbClangFormat::OnUpdateMenuFormatEditorFile)
-    EVT_UPDATE_UI(ID_FORMAT_EDITOR_SELECTION, cbClangFormat::OnUpdateMenuFormatEditorSelection)
-    //EVT_UPDATE_UI(ID_FORMAT_PROJECT_FILE,     cbClangFormat::OnUpdateProjectFile)
-    EVT_END_PROCESS(ID_PROCESS_EDITOR,        cbClangFormat::OnProcessEnd)
+    EVT_MENU(ID_FORMAT_EDITOR_FILE,                cbClangFormat::OnFormatEditorFile)
+    EVT_MENU(ID_FORMAT_EDITOR_SELECTION,           cbClangFormat::OnFormatEditorSelection)
+    EVT_MENU(ID_MENU_FORMAT_EDITOR_FILE,           cbClangFormat::OnMenuFormatEditorFile)
+    EVT_MENU(ID_MENU_FORMAT_EDITOR_SELECTION,      cbClangFormat::OnMenuFormatEditorSelection)
+    EVT_MENU(ID_FORMAT_PROJECT_FILE,               cbClangFormat::OnFormatProjectFile)
+    EVT_UPDATE_UI(ID_MENU_FORMAT_EDITOR_FILE,      cbClangFormat::OnUpdateMenuFormatEditorFile)
+    EVT_UPDATE_UI(ID_MENU_FORMAT_EDITOR_SELECTION, cbClangFormat::OnUpdateMenuFormatEditorSelection)
+    //EVT_UPDATE_UI(ID_FORMAT_PROJECT_FILE,          cbClangFormat::OnUpdateProjectFile)
+    EVT_END_PROCESS(ID_PROCESS_EDITOR,             cbClangFormat::OnProcessEnd)
 END_EVENT_TABLE()
 
 // constructor
@@ -79,8 +81,8 @@ void cbClangFormat::BuildMenu(wxMenuBar* menuBar)
     wxMenu *editMenu = menuBar->GetMenu(i);
 
     editMenu->AppendSeparator();
-    editMenu->Append(ID_FORMAT_EDITOR_FILE, _("clang-format"));
-    editMenu->Append(ID_FORMAT_EDITOR_SELECTION, _("clang-format selection"));
+    editMenu->Append(ID_MENU_FORMAT_EDITOR_FILE, _("clang-format"));
+    editMenu->Append(ID_MENU_FORMAT_EDITOR_SELECTION, _("clang-format selection"));
 }
 
 void cbClangFormat::BuildModuleMenu(const ModuleType type, wxMenu* menu, const FileTreeData* data)
@@ -102,7 +104,7 @@ void cbClangFormat::BuildModuleMenu(const ModuleType type, wxMenu* menu, const F
 
 void cbClangFormat::OnProcessGeneratedOutputLine(const wxString &line)
 {
-    Manager::Get()->GetLogManager()->Log(line);
+    Manager::Get()->GetLogManager()->Log(_T("cbClangFormat::OnProcessGeneratedOutputLine: ") + line);
 }
 
 wxString cbClangFormat::GetClangFormatBinaryName()
@@ -209,7 +211,8 @@ void cbClangFormat::StartClangFormat(const wxString &cmd, cbEditor *ed)
 {
     ClangFormatProcess *pPrcs = new ClangFormatProcess(this, ID_PROCESS_EDITOR);
     Manager::Get()->GetLogManager()->Log(_("cbClangFormat plugin calling: ") + cmd);
-    if ( !wxExecute(cmd, wxEXEC_ASYNC|wxEXEC_MAKE_GROUP_LEADER, pPrcs) )
+    int pid = wxExecute(cmd, wxEXEC_ASYNC|wxEXEC_MAKE_GROUP_LEADER, pPrcs);
+    if ( !pid )
     {
         delete pPrcs;
         pPrcs = NULL;
@@ -222,12 +225,14 @@ void cbClangFormat::StartClangFormat(const wxString &cmd, cbEditor *ed)
     if(!ostrm || !stc)
     {
         Manager::Get()->GetLogManager()->DebugLog(_T("cbClangFormat plugin: error getting ostream to process"));
-        //pPrcs->Kill()
+        wxProcess::Kill(pid);
         return;
     }
+    wxTextOutputStream sIn(*ostrm);
     wxString str = stc->GetTextRange(0, stc->GetLastPosition());
-    ostrm->Write(str.GetData(), str.Length());
+    sIn.WriteString(str);
     ostrm->Close();
+    clangFormatProcesses_[pid] = pPrcs;
 }
 
 void cbClangFormat::OnFormatProjectFile(wxCommandEvent& event)
@@ -238,6 +243,7 @@ void cbClangFormat::OnFormatProjectFile(wxCommandEvent& event)
     Manager::Get()->GetLogManager()->Log(_("cbClangFormat plugin calling: ") + cmd);
 
     // EVT_END_PROCESS for processes with id ID_PROCESS_PROJECT_FILE are not processed so they delete themselves
+    //PipedProcess
     ClangFormatProcess *pPrcs = new ClangFormatProcess(this, ID_PROCESS_PROJECT_FILE);
     if ( !wxExecute(cmd, wxEXEC_ASYNC|wxEXEC_MAKE_GROUP_LEADER, pPrcs) )
     {
@@ -258,23 +264,27 @@ void cbClangFormat::OnUpdateMenuFormatEditorSelection(wxUpdateUIEvent& event)
     event.Enable(ed && ed->HasSelection());
 }
 
-void cbClangFormat::OnProcessEnd(wxProcessEvent & /*event*/)
+void cbClangFormat::OnProcessEnd(wxProcessEvent & event)
 {
     Manager::Get()->GetLogManager()->Log(_T("cbClangFormat::OnProcessEnd"));
-//    if ( !m_pProcess )
-//        return;
-//
-//    m_view->GetWindow()->SetMessage(_T("Parsing results..."), 50);
-//    Manager::Get()->GetLogManager()->Log(_T("Parsing results..."));
-//
-//    while (m_pProcess->ReadProcessOutput())
-//        ;
+    int pid = event.GetPid();
+    auto it = clangFormatProcesses_.find(pid);
+    if ( it == clangFormatProcesses_.end() )
+        return;
+    clangFormatProcesses_.erase(pid);
+
+    ClangFormatProcess *pPrcs = it->second;
+    if(!pPrcs) return;
+
+
+    while (pPrcs->ReadProcessOutput());
 //
 //    m_thrd = new CscopeParserThread(this, m_CscouptOutput);
 //    m_thrd->Create();
 //    m_thrd->Run();
 //
 //    Manager::Get()->GetLogManager()->Log(_T("parser Thread started"));
+    delete pPrcs;
 }
 
 //void CscopePlugin::OnParserThreadEnded(wxCommandEvent &event)
