@@ -3,6 +3,7 @@
 #include <cbstyledtextctrl.h>
 #include "cbClangFormat.h"
 #include "ClangFormatProcess.h"
+#include <wx/sstream.h>
 
 // Register the plugin with Code::Blocks.
 // We are using an anonymous namespace so we don't litter the global one.
@@ -102,10 +103,10 @@ void cbClangFormat::BuildModuleMenu(const ModuleType type, wxMenu* menu, const F
     }
 }
 
-void cbClangFormat::OnProcessGeneratedOutputLine(const wxString &line)
-{
-    Manager::Get()->GetLogManager()->Log(_T("cbClangFormat::OnProcessGeneratedOutputLine: ") + line);
-}
+//void cbClangFormat::OnProcessGeneratedOutputLine(const wxString &line)
+//{
+//    Manager::Get()->GetLogManager()->Log(_T("cbClangFormat::OnProcessGeneratedOutputLine: ") + line);
+//}
 
 wxString cbClangFormat::GetClangFormatBinaryName()
 {
@@ -180,7 +181,7 @@ void cbClangFormat::OnFormatEditorSelection(wxCommandEvent& event)
 void cbClangFormat::FormatEditorFile(cbEditor *ed)
 {
     wxString cmd( GetClangFormatBinaryName() +
-                 _T(" -output-replacements-xml -assume-filename=") + ed->GetFilename() );
+                 _T(" -output-replacements-xml -style=file -assume-filename=") + ed->GetFilename() );
 
     StartClangFormat(cmd, ed);
 }
@@ -191,7 +192,7 @@ void cbClangFormat::FormatEditorFileSelection(cbEditor *ed)
     if(!stc) return;
 
     int pos = stc->GetCurrentPos();
-    int start = stc->LineFromPosition(pos) + 1;
+    int start = stc->LineFromPosition(pos) + 1;//clang line numbering is not 0 based
     pos = stc->GetAnchor();
     int stop = stc->LineFromPosition(pos) + 1;
 
@@ -202,7 +203,7 @@ void cbClangFormat::FormatEditorFileSelection(cbEditor *ed)
     // -lines=5:10
     wxString cmd( GetClangFormatBinaryName() +
                  _T(" -lines=") + wxString::Format(_T("%d"), start) + _T(":") + wxString::Format(_T("%d "), stop) +
-                 _T(" -output-replacements-xml -assume-filename=") + ed->GetFilename() );
+                 _T(" -output-replacements-xml -style=file -assume-filename=") + ed->GetFilename() );
 
     StartClangFormat(cmd, ed);
 }
@@ -239,7 +240,7 @@ void cbClangFormat::OnFormatProjectFile(wxCommandEvent& event)
 {
     if(fullPath_.IsEmpty()) return;
 
-    wxString cmd( GetClangFormatBinaryName() + _(" -i ") + fullPath_ );
+    wxString cmd( GetClangFormatBinaryName() + _(" -i -style=file ") + fullPath_ );
     Manager::Get()->GetLogManager()->Log(_("cbClangFormat plugin calling: ") + cmd);
 
     // EVT_END_PROCESS for processes with id ID_PROCESS_PROJECT_FILE are not processed so they delete themselves
@@ -273,18 +274,62 @@ void cbClangFormat::OnProcessEnd(wxProcessEvent & event)
         return;
     clangFormatProcesses_.erase(pid);
 
-    ClangFormatProcess *pPrcs = it->second;
-    if(!pPrcs) return;
+    ClangFormatProcess *prcs = it->second;
+    if(!prcs) return;
+
+    while (prcs->ReadProcessOutput());
+
+    processOutput(prcs->getOutput());
+    delete prcs;
+}
+
+void cbClangFormat::processOutput(const wxString &str)
+{
+    Manager::Get()->GetLogManager()->Log(str);
+    TiXmlDocument doc;
+    doc.Parse(str.c_str().data(), 0, TIXML_ENCODING_LEGACY);
 
 
-    while (pPrcs->ReadProcessOutput());
+	TiXmlHandle hDoc(&doc);
+	TiXmlElement* pElem;
+	TiXmlHandle hRoot(0);
+
+	// block: name
+	{
+		pElem = hDoc.FirstChildElement().Element();
+		// should always have a valid root but handle gracefully if it does
+		if (!pElem) return;
+		Manager::Get()->GetLogManager()->Log(wxString::Format(_T("name: %s"),  pElem->Value()));
+
+		// save this for later
+		hRoot=TiXmlHandle(pElem);
+	}
+
+
+//    wxStringInputStream strm(str);
+//    wxXmlDocument xml(strm);
 //
-//    m_thrd = new CscopeParserThread(this, m_CscouptOutput);
-//    m_thrd->Create();
-//    m_thrd->Run();
+//    wxXmlNode *node = xml.GetRoot()->GetChildren();
+//    while (node)
+//    {
+//        if ( node->GetName() == _T("replacement") )
+//        {
+//            wxString offsetStr, lengthStr;
+//            uint32_t offset = 0, lenght = 0;
+//            if( node->GetPropVal(_T("offset"), &offsetStr) && node->GetPropVal(_T("length"), &lengthStr) )
+//            {
+//                wxString content = node->GetNodeContent();
 //
-//    Manager::Get()->GetLogManager()->Log(_T("parser Thread started"));
-    delete pPrcs;
+//                Manager::Get()->GetLogManager()->Log(_T("name: ") + node->GetName() +
+//                                                     _T(" O: ") + offsetStr +
+//                                                     _T(" L: ") + lengthStr +
+//                                                     wxString::Format(_T(" -> %d|"), content.length()) + content +
+//                                                     _T("|")
+//                                                     );
+//            }
+//        }
+//        node = node->GetNext();
+//    }
 }
 
 //void CscopePlugin::OnParserThreadEnded(wxCommandEvent &event)

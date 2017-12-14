@@ -20,35 +20,33 @@ ClangFormatProcess::ClangFormatProcess(cbClangFormat* parent, long id):
     pollTimer_.Start(50);
 }
 
-ClangFormatProcess::~ClangFormatProcess(){}
+ClangFormatProcess::~ClangFormatProcess()
+{
+    pollTimer_.Stop();
+}
 
 bool ClangFormatProcess::ReadProcessOutput()
 {
-    Manager::Get()->GetLogManager()->Log(_("ClangFormatProcess::ReadProcessOutput()"));
     bool hasInput = false;
     if (IsInputAvailable())
     {
-
         wxTextInputStream ts(*GetInputStream());
         wxString line = ts.ReadLine();
 
         if(line.Length())
-        {
-            parent_->OnProcessGeneratedOutputLine(line);
-        }
+            output_ += line;
+
         hasInput = true;
     }
 
     if ( IsErrorAvailable() )
     {
-        Manager::Get()->GetLogManager()->Log(_("IsErrorAvailable"));
         wxTextInputStream ts(*GetErrorStream());
         wxString line = ts.ReadLine();
 
         if(line.Length())
-        {
-            parent_->OnProcessGeneratedOutputLine(line);
-        }
+            Manager::Get()->GetLogManager()->LogError(_("ClangFormat error: ") + line);
+
         hasInput = true;
     }
     return hasInput;
@@ -56,12 +54,12 @@ bool ClangFormatProcess::ReadProcessOutput()
 
 void ClangFormatProcess::OnTimer(wxTimerEvent&)
 {
-    wxWakeUpIdle();
+    while ( ReadProcessOutput() );
+    //wxWakeUpIdle();
 }
 
 void ClangFormatProcess::OnIdle(wxIdleEvent&)
 {
-    while ( ReadProcessOutput() )
-        ;
+    //while ( ReadProcessOutput() );
 }
 

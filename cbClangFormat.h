@@ -134,6 +134,7 @@ class cbClangFormat : public cbPlugin
         void OnUpdateMenuFormatEditorFile(wxUpdateUIEvent& event);
         void OnUpdateMenuFormatEditorSelection(wxUpdateUIEvent& event);
         void OnProcessEnd(wxProcessEvent &event);
+        void processOutput(const wxString &str);
 
         std::map<int,ClangFormatProcess*> clangFormatProcesses_;
 

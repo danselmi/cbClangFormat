@@ -14,8 +14,10 @@ class ClangFormatProcess : public wxProcess
         ClangFormatProcess(cbClangFormat* parent, long id);
         virtual ~ClangFormatProcess();
         bool ReadProcessOutput();
+        wxString getOutput(){return output_;}
     protected:
     private:
+        wxString output_;
         virtual void OnTimer(wxTimerEvent& event);
         virtual void OnIdle(wxIdleEvent& event);
         DECLARE_EVENT_TABLE()
