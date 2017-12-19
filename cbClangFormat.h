@@ -120,6 +120,11 @@ class cbClangFormat : public cbPlugin
     public:
         void OnProcessGeneratedOutputLine(const wxString &line);
     private:
+        struct Replacement
+        {
+            long offset, length;
+            wxString str;
+        };
         wxString fullPath_;
         wxString GetClangFormatBinaryName();
         void PrepareModuleMenu(wxMenu* menu, const wxString &fullPath);
@@ -134,9 +139,10 @@ class cbClangFormat : public cbPlugin
         void OnUpdateMenuFormatEditorFile(wxUpdateUIEvent& event);
         void OnUpdateMenuFormatEditorSelection(wxUpdateUIEvent& event);
         void OnProcessEnd(wxProcessEvent &event);
-        void processOutput(const wxString &str);
+        void processOutput(const wxArrayString &str, const wxString &filename);
+        void applyReplacements(std::vector<Replacement> &replacements, const wxString &filename);
 
-        std::map<int,ClangFormatProcess*> clangFormatProcesses_;
+        std::map<int, ClangFormatProcess*> clangFormatProcesses_;
 
         DECLARE_EVENT_TABLE();
 };

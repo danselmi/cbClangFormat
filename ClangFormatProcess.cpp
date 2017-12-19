@@ -8,9 +8,10 @@ BEGIN_EVENT_TABLE(ClangFormatProcess, wxProcess)
     EVT_IDLE(ClangFormatProcess::OnIdle)
 END_EVENT_TABLE()
 
-ClangFormatProcess::ClangFormatProcess(cbClangFormat* parent, long id):
+ClangFormatProcess::ClangFormatProcess(cbClangFormat* parent, long id, wxString filename):
     wxProcess(parent, id),
-    pollTimer_(this)
+    pollTimer_(this),
+    filename_(filename)
 {
     wxASSERT(parent);
     parent_ = parent;
@@ -32,9 +33,10 @@ bool ClangFormatProcess::ReadProcessOutput()
     {
         wxTextInputStream ts(*GetInputStream());
         wxString line = ts.ReadLine();
+        //Manager::Get()->GetLogManager()->Log(line);
 
         if(line.Length())
-            output_ += line;
+            output_.Add(line);
 
         hasInput = true;
     }
@@ -54,12 +56,11 @@ bool ClangFormatProcess::ReadProcessOutput()
 
 void ClangFormatProcess::OnTimer(wxTimerEvent&)
 {
-    while ( ReadProcessOutput() );
-    //wxWakeUpIdle();
+    wxWakeUpIdle();
 }
 
 void ClangFormatProcess::OnIdle(wxIdleEvent&)
 {
-    //while ( ReadProcessOutput() );
+    while ( ReadProcessOutput() );
 }
 

@@ -11,13 +11,15 @@ class ClangFormatProcess : public wxProcess
         cbClangFormat* parent_;
         wxTimer pollTimer_;
     public:
-        ClangFormatProcess(cbClangFormat* parent, long id);
+        ClangFormatProcess(cbClangFormat* parent, long id, wxString filename);
         virtual ~ClangFormatProcess();
         bool ReadProcessOutput();
-        wxString getOutput(){return output_;}
+        const wxArrayString &getOutput(){return output_;}
+        const wxString &getFilename(){return filename_;}
     protected:
     private:
-        wxString output_;
+        wxString filename_;
+        wxArrayString output_;
         virtual void OnTimer(wxTimerEvent& event);
         virtual void OnIdle(wxIdleEvent& event);
         DECLARE_EVENT_TABLE()

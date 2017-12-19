@@ -210,8 +210,8 @@ void cbClangFormat::FormatEditorFileSelection(cbEditor *ed)
 
 void cbClangFormat::StartClangFormat(const wxString &cmd, cbEditor *ed)
 {
-    ClangFormatProcess *pPrcs = new ClangFormatProcess(this, ID_PROCESS_EDITOR);
-    Manager::Get()->GetLogManager()->Log(_("cbClangFormat plugin calling: ") + cmd);
+    ClangFormatProcess *pPrcs = new ClangFormatProcess(this, ID_PROCESS_EDITOR, ed->GetFilename());
+    Manager::Get()->GetLogManager()->Log(_("StartClangFormat calling: ") + cmd);
     int pid = wxExecute(cmd, wxEXEC_ASYNC|wxEXEC_MAKE_GROUP_LEADER, pPrcs);
     if ( !pid )
     {
@@ -231,6 +231,7 @@ void cbClangFormat::StartClangFormat(const wxString &cmd, cbEditor *ed)
     }
     wxTextOutputStream sIn(*ostrm);
     wxString str = stc->GetTextRange(0, stc->GetLastPosition());
+    //Manager::Get()->GetLogManager()->Log(_T("streaming: ") + str);
     sIn.WriteString(str);
     ostrm->Close();
     clangFormatProcesses_[pid] = pPrcs;
@@ -245,7 +246,7 @@ void cbClangFormat::OnFormatProjectFile(wxCommandEvent& event)
 
     // EVT_END_PROCESS for processes with id ID_PROCESS_PROJECT_FILE are not processed so they delete themselves
     //PipedProcess
-    ClangFormatProcess *pPrcs = new ClangFormatProcess(this, ID_PROCESS_PROJECT_FILE);
+    ClangFormatProcess *pPrcs = new ClangFormatProcess(this, ID_PROCESS_PROJECT_FILE, fullPath_);
     if ( !wxExecute(cmd, wxEXEC_ASYNC|wxEXEC_MAKE_GROUP_LEADER, pPrcs) )
     {
         delete pPrcs;
@@ -275,35 +276,76 @@ void cbClangFormat::OnProcessEnd(wxProcessEvent & event)
     clangFormatProcesses_.erase(pid);
 
     ClangFormatProcess *prcs = it->second;
-    if(!prcs) return;
+    if(!prcs)
+    {
+        return;
+    }
 
     while (prcs->ReadProcessOutput());
 
-    processOutput(prcs->getOutput());
+    processOutput(prcs->getOutput(), prcs->getFilename());
     delete prcs;
 }
 
-void cbClangFormat::processOutput(const wxString &str)
+void cbClangFormat::processOutput(const wxArrayString &lines, const wxString &filename)
 {
-    Manager::Get()->GetLogManager()->Log(str);
-    TiXmlDocument doc;
-    doc.Parse(str.c_str().data(), 0, TIXML_ENCODING_LEGACY);
+    wxRegEx expresionStart(_T("<replacement +offset *= *'([0-9]+)' *length *= *'([0-9]+)' *>"), /*wxRE_ADVANCED +*/ wxRE_ICASE);
+    wxRegEx expresionEnd(_T("< */replacement *>"), /*wxRE_ADVANCED +*/ wxRE_ICASE);
+    if( !(expresionStart.IsValid() && expresionEnd.IsValid()) )
+        return;
+    std::vector<Replacement> replacements;
+    for ( size_t k = 0 ; k < lines.size() ; ++k )
+    {
+        const wxString &str =  lines[k];
+        Replacement rep;
 
+        if( expresionStart.Matches(str) && expresionEnd.Matches(str) )
+        {
+            size_t first, len;
+            if(expresionStart.GetMatch( &first, &len, 1))
+                if(!str.Mid(first, len).ToLong(&rep.offset))
+                    continue;
+            if(expresionStart.GetMatch( &first, &len, 2))
+                if(!str.Mid(first, len).ToLong(&rep.length))
+                    continue;
 
-	TiXmlHandle hDoc(&doc);
-	TiXmlElement* pElem;
-	TiXmlHandle hRoot(0);
+            size_t start, last, dummy;
+            if( expresionStart.GetMatch(&dummy, &start, 0) && expresionEnd.GetMatch(&last, &dummy) )
+            {
+                rep.str = str.Mid(start, last-start);
+                replacements.push_back(rep);
+            }
+        }
+    }
 
-	// block: name
-	{
-		pElem = hDoc.FirstChildElement().Element();
-		// should always have a valid root but handle gracefully if it does
-		if (!pElem) return;
-		Manager::Get()->GetLogManager()->Log(wxString::Format(_T("name: %s"),  pElem->Value()));
+    applyReplacements(replacements, filename);
 
-		// save this for later
-		hRoot=TiXmlHandle(pElem);
-	}
+//    TiXmlDocument doc;
+//    bool oldCondenseWhiteSpace = TiXmlBase::IsWhiteSpaceCondensed();
+//    TiXmlBase::SetCondenseWhiteSpace(false);
+//    doc.Parse(str.mb_str(), 0, /*TIXML_ENCODING_LEGACY*/ /*TIXML_ENCODING_UNKNOWN*/ TIXML_ENCODING_UTF8);
+//    TiXmlHandle hDoc(&doc);
+//    TiXmlElement *pElem = hDoc.FirstChild("replacements").FirstChild("replacement").Element();
+//    if (!pElem) return;
+//
+//    for( ; pElem ; pElem = pElem->NextSiblingElement())
+//    {
+//        const char *pText = pElem->GetText();
+//        int offset, length;
+//        pElem->QueryIntAttribute("offset", &offset);
+//        pElem->QueryIntAttribute("length", &length);
+//        //pElem->Row()
+//        //pElem->Value()
+//        // pElem->GetText()
+//        //pElem->GetTe
+////        TiXmlText *txtElem = pElem->ToText();
+////        if(txtElem)
+////            pText = txtElem->Value();
+//        //if(pText)
+//            Manager::Get()->GetLogManager()->Log(wxString::Format(_T("O: %d; L: %d;  %s"), offset, length, pText));
+//    }
+//
+//    TiXmlBase::SetCondenseWhiteSpace(oldCondenseWhiteSpace);
 
 
 //    wxStringInputStream strm(str);
@@ -332,14 +374,37 @@ void cbClangFormat::processOutput(const wxString &str)
 //    }
 }
 
-//void CscopePlugin::OnParserThreadEnded(wxCommandEvent &event)
-//{
-//    delete m_pProcess;
-//    m_pProcess = NULL;
-//
-//    m_thrd = NULL;
-//
-//	CscopeResultTable *result = (CscopeResultTable*)event.GetClientData();
-//	m_view->GetWindow()->SetMessage(m_EndMsg, 100);
-//	m_view->GetWindow()->BuildTable( result );
-//}
+void cbClangFormat::applyReplacements(std::vector<Replacement> &replacements, const wxString &filename)
+{
+    EditorManager *edman = Manager::Get()->GetEditorManager();
+    if (!edman ) return;
+    if( !edman->IsOpen(filename) ) return;
+
+    cbEditor *ed = edman->GetBuiltinEditor(filename);
+    if(!ed) return;
+
+    cbStyledTextCtrl *stc = ed->GetControl();
+    if(!stc) return;
+
+    Manager::Get()->GetLogManager()->Log(wxString::Format(_T("lp: %d"),stc->GetLastPosition() ));
+
+    stc->BeginUndoAction();
+//    for (std::vector<Replacement>::reverse_iterator rit = replacements.rbegin(); rit != replacements.rend(); ++rit)
+    for (std::vector<Replacement>::iterator rit = replacements.begin(); rit != replacements.end(); ++rit)
+    {
+        wxString &str = rit->str;
+        str.Replace(_T("&#13;&#10;"), _T("\n"));
+        str.Replace(_T("&#10;"), _T("\n"));
+        str.Replace(_T("&#13;"), _T("\n"));
+        str.Replace(_T("&lt;"), _T("<"));
+        str.Replace(_T("&gt;"), _T(">"));
+        str.Replace(_T("&amp;"), _T("&"));
+        str.Replace(_T("&apos;"), _T("'"));
+        str.Replace(_T("&quot;"), _T("\""));
+
+        stc->Replace(rit->offset, rit->offset+rit->length, str);
+        Manager::Get()->GetLogManager()->Log(wxString::Format(_T("output: O: %d;  L: %d; repl: ") + str, rit->offset , rit->length));
+    }
+
+    stc->EndUndoAction();
+}
