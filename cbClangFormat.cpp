@@ -53,32 +53,18 @@ cbClangFormat::~cbClangFormat()
 
 void cbClangFormat::OnAttach()
 {
-    // do whatever initialization you need for your plugin
-    // NOTE: after this function, the inherited member variable
-    // m_IsAttached will be TRUE...
-    // You should check for it in other functions, because if it
-    // is FALSE, it means that the application did *not* "load"
-    // (see: does not need) this plugin...
 }
 
 void cbClangFormat::OnRelease(bool appShutDown)
 {
-    // do de-initialization for your plugin
-    // if appShutDown is true, the plugin is unloaded because Code::Blocks is being shut down,
-    // which means you must not use any of the SDK Managers
-    // NOTE: after this function, the inherited member variable
-    // m_IsAttached will be FALSE...
 }
 
 void cbClangFormat::BuildMenu(wxMenuBar* menuBar)
 {
-    Manager::Get()->GetLogManager()->DebugLog(_T("cbClangFormat plugin: Building menu"));
     int i = menuBar->FindMenu(_("&Edit"));
     if (i == wxNOT_FOUND)
-    {
-        Manager::Get()->GetLogManager()->DebugLog(_T("cbClangFormat plugin: edit menu not found"));
         return;
-    }
+
     wxMenu *editMenu = menuBar->GetMenu(i);
 
     editMenu->AppendSeparator();
@@ -103,14 +89,9 @@ void cbClangFormat::BuildModuleMenu(const ModuleType type, wxMenu* menu, const F
     }
 }
 
-//void cbClangFormat::OnProcessGeneratedOutputLine(const wxString &line)
-//{
-//    Manager::Get()->GetLogManager()->Log(_T("cbClangFormat::OnProcessGeneratedOutputLine: ") + line);
-//}
-
 wxString cbClangFormat::GetClangFormatBinaryName()
 {
-    return wxString(_T("c:\\tools\\bin\\clang-format-r318667.exe"));
+    return wxString(_T("clang-format"));
 }
 
 void cbClangFormat::PrepareModuleMenu(wxMenu* menu, const wxString &fullPath)
@@ -217,7 +198,7 @@ void cbClangFormat::StartClangFormat(const wxString &cmd, cbEditor *ed)
     {
         delete pPrcs;
         pPrcs = NULL;
-        Manager::Get()->GetLogManager()->DebugLog(_T("cbClangFormat plugin: error calling clang-format"));
+        Manager::Get()->GetLogManager()->Log(_T("cbClangFormat plugin: error calling clang-format"));
         return;
     }
 
@@ -225,14 +206,13 @@ void cbClangFormat::StartClangFormat(const wxString &cmd, cbEditor *ed)
     cbStyledTextCtrl *stc = ed->GetControl();
     if(!ostrm || !stc)
     {
-        Manager::Get()->GetLogManager()->DebugLog(_T("cbClangFormat plugin: error getting ostream to process"));
+        Manager::Get()->GetLogManager()->Log(_T("cbClangFormat plugin: error getting ostream to process"));
         wxProcess::Kill(pid);
         return;
     }
     wxTextOutputStream sIn(*ostrm);
     wxString str = stc->GetTextRange(0, stc->GetLastPosition());
     str.Replace(_T("\r\n"), _T("\n"));
-    //Manager::Get()->GetLogManager()->Log(_T("streaming: ") + str);
     sIn.WriteString(str);
     ostrm->Close();
     clangFormatProcesses_[pid] = pPrcs;
@@ -269,7 +249,6 @@ void cbClangFormat::OnUpdateMenuFormatEditorSelection(wxUpdateUIEvent& event)
 
 void cbClangFormat::OnProcessEnd(wxProcessEvent & event)
 {
-    Manager::Get()->GetLogManager()->Log(_T("cbClangFormat::OnProcessEnd"));
     int pid = event.GetPid();
     auto it = clangFormatProcesses_.find(pid);
     if ( it == clangFormatProcesses_.end() )
@@ -278,9 +257,7 @@ void cbClangFormat::OnProcessEnd(wxProcessEvent & event)
 
     ClangFormatProcess *prcs = it->second;
     if(!prcs)
-    {
         return;
-    }
 
     while (prcs->ReadProcessOutput());
 
@@ -334,13 +311,10 @@ void cbClangFormat::applyReplacements(std::vector<Replacement> &replacements, co
     cbStyledTextCtrl *stc = ed->GetControl();
     if(!stc) return;
 
-    Manager::Get()->GetLogManager()->Log(wxString::Format(_T("lp: %d"),stc->GetLastPosition() ));
-
     stc->BeginUndoAction();
     for (std::vector<Replacement>::reverse_iterator rit = replacements.rbegin(); rit != replacements.rend(); ++rit)
     {
         wxString &str = rit->str;
-        str.Replace(_T("&#13;&#10;"), _T("\r\n"));
         str.Replace(_T("&#10;"), _T("\n"));
         str.Replace(_T("&#13;"), _T("\r"));
         str.Replace(_T("&lt;"), _T("<"));
@@ -350,7 +324,6 @@ void cbClangFormat::applyReplacements(std::vector<Replacement> &replacements, co
         str.Replace(_T("&quot;"), _T("\""));
 
         stc->Replace(rit->offset, rit->offset+rit->length, str);
-        Manager::Get()->GetLogManager()->Log(wxString::Format(_T("output: O: %d;  L: %d; repl: ") + str, rit->offset , rit->length));
     }
 
     stc->EndUndoAction();
