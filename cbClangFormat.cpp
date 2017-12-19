@@ -231,6 +231,7 @@ void cbClangFormat::StartClangFormat(const wxString &cmd, cbEditor *ed)
     }
     wxTextOutputStream sIn(*ostrm);
     wxString str = stc->GetTextRange(0, stc->GetLastPosition());
+    str.Replace(_T("\r\n"), _T("\n"));
     //Manager::Get()->GetLogManager()->Log(_T("streaming: ") + str);
     sIn.WriteString(str);
     ostrm->Close();
@@ -319,59 +320,6 @@ void cbClangFormat::processOutput(const wxArrayString &lines, const wxString &fi
     }
 
     applyReplacements(replacements, filename);
-
-//    TiXmlDocument doc;
-//    bool oldCondenseWhiteSpace = TiXmlBase::IsWhiteSpaceCondensed();
-//    TiXmlBase::SetCondenseWhiteSpace(false);
-//    doc.Parse(str.mb_str(), 0, /*TIXML_ENCODING_LEGACY*/ /*TIXML_ENCODING_UNKNOWN*/ TIXML_ENCODING_UTF8);
-//    TiXmlHandle hDoc(&doc);
-//    TiXmlElement *pElem = hDoc.FirstChild("replacements").FirstChild("replacement").Element();
-//    if (!pElem) return;
-//
-//    for( ; pElem ; pElem = pElem->NextSiblingElement())
-//    {
-//        const char *pText = pElem->GetText();
-//        int offset, length;
-//        pElem->QueryIntAttribute("offset", &offset);
-//        pElem->QueryIntAttribute("length", &length);
-//        //pElem->Row()
-//        //pElem->Value()
-//        // pElem->GetText()
-//        //pElem->GetTe
-////        TiXmlText *txtElem = pElem->ToText();
-////        if(txtElem)
-////            pText = txtElem->Value();
-//        //if(pText)
-//            Manager::Get()->GetLogManager()->Log(wxString::Format(_T("O: %d; L: %d;  %s"), offset, length, pText));
-//    }
-//
-//    TiXmlBase::SetCondenseWhiteSpace(oldCondenseWhiteSpace);
-
-
-//    wxStringInputStream strm(str);
-//    wxXmlDocument xml(strm);
-//
-//    wxXmlNode *node = xml.GetRoot()->GetChildren();
-//    while (node)
-//    {
-//        if ( node->GetName() == _T("replacement") )
-//        {
-//            wxString offsetStr, lengthStr;
-//            uint32_t offset = 0, lenght = 0;
-//            if( node->GetPropVal(_T("offset"), &offsetStr) && node->GetPropVal(_T("length"), &lengthStr) )
-//            {
-//                wxString content = node->GetNodeContent();
-//
-//                Manager::Get()->GetLogManager()->Log(_T("name: ") + node->GetName() +
-//                                                     _T(" O: ") + offsetStr +
-//                                                     _T(" L: ") + lengthStr +
-//                                                     wxString::Format(_T(" -> %d|"), content.length()) + content +
-//                                                     _T("|")
-//                                                     );
-//            }
-//        }
-//        node = node->GetNext();
-//    }
 }
 
 void cbClangFormat::applyReplacements(std::vector<Replacement> &replacements, const wxString &filename)
@@ -389,13 +337,12 @@ void cbClangFormat::applyReplacements(std::vector<Replacement> &replacements, co
     Manager::Get()->GetLogManager()->Log(wxString::Format(_T("lp: %d"),stc->GetLastPosition() ));
 
     stc->BeginUndoAction();
-//    for (std::vector<Replacement>::reverse_iterator rit = replacements.rbegin(); rit != replacements.rend(); ++rit)
-    for (std::vector<Replacement>::iterator rit = replacements.begin(); rit != replacements.end(); ++rit)
+    for (std::vector<Replacement>::reverse_iterator rit = replacements.rbegin(); rit != replacements.rend(); ++rit)
     {
         wxString &str = rit->str;
-        str.Replace(_T("&#13;&#10;"), _T("\n"));
+        str.Replace(_T("&#13;&#10;"), _T("\r\n"));
         str.Replace(_T("&#10;"), _T("\n"));
-        str.Replace(_T("&#13;"), _T("\n"));
+        str.Replace(_T("&#13;"), _T("\r"));
         str.Replace(_T("&lt;"), _T("<"));
         str.Replace(_T("&gt;"), _T(">"));
         str.Replace(_T("&amp;"), _T("&"));
