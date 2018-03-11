@@ -130,10 +130,12 @@ class cbClangFormat : public cbPlugin
         void PrepareModuleMenu(wxMenu* menu, const wxString &fullPath);
         void OnMenuFormatEditorFile(wxCommandEvent& event);
         void OnMenuFormatEditorSelection(wxCommandEvent& event);
-        void OnFormatEditorFile(wxCommandEvent& event);
         void OnFormatEditorSelection(wxCommandEvent& event);
+        void OnFormatEditorFile(wxCommandEvent& event);
+        void OnDisableFormatForSelection(wxCommandEvent& event);
         void FormatEditorFile(cbEditor *ed);
         void FormatEditorFileSelection(cbEditor *ed);
+        void DisableFormatForSelection(cbEditor *ed);
         void StartClangFormat(const wxString &cmd, cbEditor *ed);
         void OnFormatProjectFile(wxCommandEvent& event);
         void OnUpdateMenuFormatEditorFile(wxUpdateUIEvent& event);

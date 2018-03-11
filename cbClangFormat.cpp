@@ -11,11 +11,12 @@ namespace
 {
     PluginRegistrant<cbClangFormat> reg(_T("cbClangFormat"));
 
-    const long ID_MENU_FORMAT_EDITOR_FILE      = wxNewId();
-    const long ID_MENU_FORMAT_EDITOR_SELECTION = wxNewId();
-    const long ID_FORMAT_EDITOR_FILE           = wxNewId();
-    const long ID_FORMAT_EDITOR_SELECTION      = wxNewId();
-    const long ID_FORMAT_PROJECT_FILE          = wxNewId();
+    const long ID_MENU_FORMAT_EDITOR_FILE             = wxNewId();
+    const long ID_MENU_FORMAT_EDITOR_SELECTION        = wxNewId();
+    const long ID_FORMAT_EDITOR_FILE                  = wxNewId();
+    const long ID_FORMAT_EDITOR_SELECTION             = wxNewId();
+    const long ID_FORMAT_PROJECT_FILE                 = wxNewId();
+    const long ID_DISABLE_FORMAT_FOR_EDITOR_SELECTION = wxNewId();
 
     const long ID_PROCESS_PROJECT_FILE         = wxNewId();
     const long ID_PROCESS_EDITOR               = wxNewId();
@@ -23,15 +24,16 @@ namespace
 
 // events handling
 BEGIN_EVENT_TABLE(cbClangFormat, cbPlugin)
-    EVT_MENU(ID_FORMAT_EDITOR_FILE,                cbClangFormat::OnFormatEditorFile)
-    EVT_MENU(ID_FORMAT_EDITOR_SELECTION,           cbClangFormat::OnFormatEditorSelection)
-    EVT_MENU(ID_MENU_FORMAT_EDITOR_FILE,           cbClangFormat::OnMenuFormatEditorFile)
-    EVT_MENU(ID_MENU_FORMAT_EDITOR_SELECTION,      cbClangFormat::OnMenuFormatEditorSelection)
-    EVT_MENU(ID_FORMAT_PROJECT_FILE,               cbClangFormat::OnFormatProjectFile)
-    EVT_UPDATE_UI(ID_MENU_FORMAT_EDITOR_FILE,      cbClangFormat::OnUpdateMenuFormatEditorFile)
-    EVT_UPDATE_UI(ID_MENU_FORMAT_EDITOR_SELECTION, cbClangFormat::OnUpdateMenuFormatEditorSelection)
-    //EVT_UPDATE_UI(ID_FORMAT_PROJECT_FILE,          cbClangFormat::OnUpdateProjectFile)
-    EVT_END_PROCESS(ID_PROCESS_EDITOR,             cbClangFormat::OnProcessEnd)
+    EVT_MENU(ID_FORMAT_EDITOR_FILE,                       cbClangFormat::OnFormatEditorFile)
+    EVT_MENU(ID_FORMAT_EDITOR_SELECTION,                  cbClangFormat::OnFormatEditorSelection)
+    EVT_MENU(ID_DISABLE_FORMAT_FOR_EDITOR_SELECTION,      cbClangFormat::OnDisableFormatForSelection)
+    EVT_MENU(ID_MENU_FORMAT_EDITOR_FILE,                  cbClangFormat::OnMenuFormatEditorFile)
+    EVT_MENU(ID_MENU_FORMAT_EDITOR_SELECTION,             cbClangFormat::OnMenuFormatEditorSelection)
+    EVT_MENU(ID_FORMAT_PROJECT_FILE,                      cbClangFormat::OnFormatProjectFile)
+    EVT_UPDATE_UI(ID_MENU_FORMAT_EDITOR_FILE,             cbClangFormat::OnUpdateMenuFormatEditorFile)
+    EVT_UPDATE_UI(ID_MENU_FORMAT_EDITOR_SELECTION,        cbClangFormat::OnUpdateMenuFormatEditorSelection)
+    EVT_UPDATE_UI(ID_DISABLE_FORMAT_FOR_EDITOR_SELECTION, cbClangFormat::OnUpdateMenuFormatEditorSelection)
+    EVT_END_PROCESS(ID_PROCESS_EDITOR,                    cbClangFormat::OnProcessEnd)
 END_EVENT_TABLE()
 
 // constructor
@@ -70,6 +72,7 @@ void cbClangFormat::BuildMenu(wxMenuBar* menuBar)
     editMenu->AppendSeparator();
     editMenu->Append(ID_MENU_FORMAT_EDITOR_FILE, _("clang-format"));
     editMenu->Append(ID_MENU_FORMAT_EDITOR_SELECTION, _("clang-format selection"));
+    editMenu->Append(ID_DISABLE_FORMAT_FOR_EDITOR_SELECTION, _("disable clang-format for selection"));
 }
 
 void cbClangFormat::BuildModuleMenu(const ModuleType type, wxMenu* menu, const FileTreeData* data)
@@ -101,7 +104,10 @@ void cbClangFormat::PrepareModuleMenu(wxMenu* menu, const wxString &fullPath)
     {
         menu->Append(ID_FORMAT_EDITOR_FILE, _("clang-format"));
         if ( edman->GetBuiltinEditor(fullPath)->HasSelection() )
+        {
             menu->Append(ID_FORMAT_EDITOR_SELECTION, _("clang-format selection"));
+            menu->Append(ID_DISABLE_FORMAT_FOR_EDITOR_SELECTION, _("disable clang-format for selection"));
+        }
     }
     else
         menu->Append(ID_FORMAT_PROJECT_FILE, _("clang-format"));
@@ -159,6 +165,21 @@ void cbClangFormat::OnFormatEditorSelection(wxCommandEvent& event)
     FormatEditorFileSelection(ed);
 }
 
+void cbClangFormat::OnDisableFormatForSelection(wxCommandEvent& event)
+{
+    EditorManager *edman = Manager::Get()->GetEditorManager();
+    if (!edman ) return;
+    if( !edman->IsOpen(fullPath_) ) return;
+
+    cbEditor *ed = edman->GetBuiltinEditor(fullPath_);
+    if(!ed) return;
+
+
+    if ( !ed->HasSelection() ) return;
+
+    DisableFormatForSelection(ed);
+}
+
 void cbClangFormat::FormatEditorFile(cbEditor *ed)
 {
     wxString cmd( GetClangFormatBinaryName() +
@@ -187,6 +208,34 @@ void cbClangFormat::FormatEditorFileSelection(cbEditor *ed)
                  _T(" -output-replacements-xml -style=file -assume-filename=") + ed->GetFilename() );
 
     StartClangFormat(cmd, ed);
+}
+
+void cbClangFormat::DisableFormatForSelection(cbEditor *ed)
+{
+    cbStyledTextCtrl *stc = ed->GetControl();
+    if(!stc) return;
+
+    int pos = stc->GetCurrentPos();
+    int start = stc->LineFromPosition(pos) + 1;//clang line numbering is not 0 based
+    pos = stc->GetAnchor();
+    int stop = stc->LineFromPosition(pos) + 1;
+
+    if ( start == stop ) return;
+
+    if ( start > stop ) std::swap(start, stop);
+
+    stc->BeginUndoAction();
+    const wxString clangFormatOffText(_T("// clang-format off\n"));
+    pos = stc->PositionFromLine(start);
+    wxString insertOffString( stc->GetTextRange(pos, stc->GetLineIndentPosition(start)) + clangFormatOffText );
+    stc->InsertText(stc->PositionFromLine(start-1), insertOffString);
+
+
+    const wxString clangFormatOnText(_T("// clang-format on\n"));
+    pos = stc->PositionFromLine(stop);
+    wxString insertOnString( stc->GetTextRange(pos, stc->GetLineIndentPosition(stop)) + clangFormatOnText );
+    stc->InsertText(stc->PositionFromLine(stop+1), insertOnString);
+    stc->EndUndoAction();
 }
 
 void cbClangFormat::StartClangFormat(const wxString &cmd, cbEditor *ed)
