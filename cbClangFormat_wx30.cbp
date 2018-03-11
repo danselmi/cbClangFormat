@@ -63,6 +63,8 @@
 		<Unit filename="ClangFormatProcess.h" />
 		<Unit filename="cbClangFormat.cpp" />
 		<Unit filename="cbClangFormat.h" />
+		<Unit filename="cbClangFormatConfig.cpp" />
+		<Unit filename="cbClangFormatConfig.h" />
 		<Unit filename="manifest.xml" />
 		<Extensions>
 			<code_completion />

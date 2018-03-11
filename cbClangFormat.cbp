@@ -16,13 +16,13 @@
 				<Option run_host_application_in_terminal="0" />
 				<Compiler>
 					<Add option="$(#CB_RELEASE_TYPE)" />
-					<Add directory="$(#wx.include)" />
-					<Add directory="$(#wx.lib)/gcc_dll/mswu" />
+					<Add directory="$(#wx28.include)" />
+					<Add directory="$(#wx28.lib)/gcc_dll/mswu" />
 				</Compiler>
 				<Linker>
 					<Add library="wxmsw28u" />
 					<Add library="codeblocks" />
-					<Add directory="$(#wx.lib)/gcc_dll" />
+					<Add directory="$(#wx28.lib)/gcc_dll" />
 					<Add directory="../../../devel" />
 				</Linker>
 				<ExtraCommands>
@@ -60,6 +60,8 @@
 		<Unit filename="ClangFormatProcess.h" />
 		<Unit filename="cbClangFormat.cpp" />
 		<Unit filename="cbClangFormat.h" />
+		<Unit filename="cbClangFormatConfig.cpp" />
+		<Unit filename="cbClangFormatConfig.h" />
 		<Unit filename="manifest.xml" />
 		<Extensions>
 			<code_completion />

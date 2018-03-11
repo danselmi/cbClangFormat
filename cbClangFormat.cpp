@@ -4,6 +4,7 @@
 #include "cbClangFormat.h"
 #include "ClangFormatProcess.h"
 #include <wx/sstream.h>
+#include "cbClangFormatConfig.h"
 
 // Register the plugin with Code::Blocks.
 // We are using an anonymous namespace so we don't litter the global one.
@@ -53,12 +54,21 @@ cbClangFormat::~cbClangFormat()
 {
 }
 
+cbConfigurationPanel* cbClangFormat::GetConfigurationPanel(wxWindow* parent)
+{
+    return new cbClangFormatConfigPanel(clangFormatExecutable_, parent);
+}
+
 void cbClangFormat::OnAttach()
 {
+    ConfigManager* cfg = Manager::Get()->GetConfigManager( _T("cbClangFormat") );
+    clangFormatExecutable_ =  cfg->Read(_T("/clangFormatExecutable"), _T("clang-format"));
 }
 
 void cbClangFormat::OnRelease(bool appShutDown)
 {
+    ConfigManager* cfg = Manager::Get()->GetConfigManager( _T("cbClangFormat") );
+    cfg->Write(_T("/clangFormatExecutable"), clangFormatExecutable_);
 }
 
 void cbClangFormat::BuildMenu(wxMenuBar* menuBar)
@@ -92,9 +102,9 @@ void cbClangFormat::BuildModuleMenu(const ModuleType type, wxMenu* menu, const F
     }
 }
 
-wxString cbClangFormat::GetClangFormatBinaryName()
+const wxString &cbClangFormat::GetClangFormatBinaryName()
 {
-    return wxString(_T("clang-format"));
+    return clangFormatExecutable_;
 }
 
 void cbClangFormat::PrepareModuleMenu(wxMenu* menu, const wxString &fullPath)

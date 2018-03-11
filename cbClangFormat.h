@@ -41,13 +41,13 @@ class cbClangFormat : public cbPlugin
           * Notice that you can logically OR more than one configuration groups,
           * so you could set it, for example, as "cgCompiler | cgContribPlugin".
           */
-        virtual int GetConfigurationGroup() const { return cgUnknown; }
+        virtual int GetConfigurationGroup() const { return cgEditor; }
 
         /** Return plugin's configuration panel.
           * @param parent The parent window.
           * @return A pointer to the plugin's cbConfigurationPanel. It is deleted by the caller.
           */
-        virtual cbConfigurationPanel* GetConfigurationPanel(wxWindow* parent){ return 0; }
+        virtual cbConfigurationPanel* GetConfigurationPanel(wxWindow* parent);
 
         /** Return plugin's configuration panel for projects.
           * The panel returned from this function will be added in the project's
@@ -126,7 +126,7 @@ class cbClangFormat : public cbPlugin
             wxString str;
         };
         wxString fullPath_;
-        wxString GetClangFormatBinaryName();
+        const wxString &GetClangFormatBinaryName();
         void PrepareModuleMenu(wxMenu* menu, const wxString &fullPath);
         void OnMenuFormatEditorFile(wxCommandEvent& event);
         void OnMenuFormatEditorSelection(wxCommandEvent& event);
@@ -145,6 +145,7 @@ class cbClangFormat : public cbPlugin
         void applyReplacements(std::vector<Replacement> &replacements, const wxString &filename);
 
         std::map<int, ClangFormatProcess*> clangFormatProcesses_;
+        wxString clangFormatExecutable_;
 
         DECLARE_EVENT_TABLE();
 };
