@@ -13,7 +13,8 @@ Details about the configuration file can be found [here](https://clang.llvm.org/
 ## Usage
 Clang format can be called through the Edit menu or through the context menu as shown here:
 ![alt text](https://github.com/danselmi/cbClangFormat/raw/master/images/ContextMenu.png "Context Menu")
+
 Where "clang-format" formats the whole file, "clang-format selection" formats only the selected block of text.
 "disable clang-format for selection" encloses the selected block with the two lines `// clang-format off` and `// clang-format on` - don't use it too much ;-).
 
-With the help of the "keyboard shortcuts" plugin, one can assugn any keyboard shortcut for a call to clang format in the Edit menu.
+With the help of the "keyboard shortcuts" plugin, one can assign any keyboard shortcut for a call to clang format in the Edit menu.
