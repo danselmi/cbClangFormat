@@ -17,7 +17,6 @@
 				<Compiler>
 					<Add option="-Wall" />
 					<Add option="-fPIC" />
-					<Add option="$(#CB_RELEASE_TYPE)" />
 					<Add option="`wx-config --cflags`" />
 					<Add option="`pkg-config --cflags codeblocks`" />
 					<Add option="-Winvalid-pch" />
